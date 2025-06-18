@@ -1,0 +1,28 @@
+# Local .terraform directories
+**/.terraform/*
+
+# Terraform plan and state files
+*.tfstate
+*.tfstate.backup
+*.tfplan
+
+# Crash logs
+crash.log
+
+# Sensitive variable files
+*.tfvars
+*.tfvars.json
+
+# CLI configuration files
+.terraformrc
+.terraform.lock.hcl
+
+# VSCode config
+.vscode/
+
+# MacOS metadata
+.DS_Store
+
+# Python virtualenv (if using automation)
+.venv/
+env/

@@ -26,7 +26,7 @@ variable "ec2_tags" {
     Terraform   = "true"
     Environment = "Dev"
     Owner       = "djoo"
-    Name        = "tf-aws-dev-ec2-RHEL9"
+    Name        = "tf-aws-dev-ec2-RHEL9-vault-agent"
     Test_Tag    = "This is a demo for Do Cloud Right Melbourne"
   }
 }
