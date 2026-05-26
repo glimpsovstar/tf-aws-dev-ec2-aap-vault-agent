@@ -56,13 +56,22 @@
       register: incident
 
     - name: Create Normal Change Request (correlation_id = workspace_id)
+      # Pattern from colleague's ansible-rhel-post-deploy/snow_drift_tickets:
+      # route the CR to the Software group + a specific user (admin) as
+      # assigned_to. The Normal Change Model still generates the 12 CAB
+      # Approval records (which the existing SN business rule auto-approves
+      # for `ws-` correlation IDs), but it ALSO generates a Change Manager
+      # approval routed to assigned_to that the BR does NOT touch. That
+      # approval sits at "requested" until the human clicks Approve in SN,
+      # which is the demo's intentional human-in-the-loop moment.
       servicenow.itsm.change_request:
         state: assess
         type: normal
         short_description: "{{ cr_short_description }}"
         description: "{{ cr_description }}"
-        assignment_group: "CAB Approval"
+        assignment_group: "Software"
         other:
+          assigned_to: "6816f79cc0a8016401c5a33be04be441"   # admin user in dev389292
           correlation_id: "{{ tfc_workspace_id }}"
           correlation_display: "TFC workspace: {{ tfc_workspace_name }}"
       register: cr
