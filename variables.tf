@@ -44,6 +44,20 @@ variable "demo_chrony_trigger" {
   description = "Bump to fire the chrony_timesync after_update action."
 }
 
+# Used by aws_instance user_data to fetch the Vault SSH CA public key at
+# first-boot and configure /etc/ssh to trust it for the `aap` user.
+variable "vault_addr" {
+  type        = string
+  description = "HCP Vault address (used by EC2 user_data to fetch the SSH CA public key)."
+  default     = "https://djoo-test-vault-public-vault-a40e8748.a3bc1cae.z1.hashicorp.cloud:8200"
+}
+
+variable "vault_namespace" {
+  type        = string
+  description = "Vault namespace for the ssh/public_key endpoint."
+  default     = "admin"
+}
+
 variable "aap_endpoint" {
   type        = string
   description = "AAP API endpoint"
