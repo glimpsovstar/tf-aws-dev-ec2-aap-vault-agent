@@ -48,7 +48,17 @@ Or do it in the AAP UI: Jobs → click the running one → Cancel; then Template
 
 **If the original TFC apply errored** because the action timed out: just re-trigger plan + apply in TFC. Resources are already in the desired state, so the plan is a no-op.
 
-### 4. Drift detection slow to fire
+### 4. "Update SNOW CMDB" fails with `root@<host>: Permission denied`
+
+**Symptom:** Workflow 24 fails at the Update SNOW CMDB node with `UNREACHABLE!` and `Permission denied (publickey,...)` against `root@<ec2-ip>`.
+
+**Why it happens:** Conceptually a SNOW-update playbook shouldn't need SSH to the host — only the SNOW credential. But the upstream `snow_cmdb_update.yml` populates the CMDB's `os` field with `ansible_distribution`, a fact gathered from the target. Without a machine credential, fact-gathering falls back to `root` user → no key → permission denied.
+
+**Workaround (used in this demo):** Attach the `aap-via-vault-signed-ssh` machine credential to JT 17 (Raise Incident Ticket) and JT 18 (Update SNOW CMDB). Side effect: audience also sees Vault-signed SSH being used by the CMDB step — actually a stronger story.
+
+**Proper fix (upstream PR opportunity):** Refactor `snow_cmdb_update.yml` and `raise-incident-ticket.yml` to use `connection: local` + `gather_facts: false`, and read `os` from inventory variables (set by Terraform at host-registration time) rather than from live facts. Decouples SNOW work from SSH access entirely.
+
+### 5. Drift detection slow to fire
 
 **Symptom:** You change a tag in AWS, but TFC drift assessment doesn't fire within demo time window.
 

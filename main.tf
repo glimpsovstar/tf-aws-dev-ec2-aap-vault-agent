@@ -4,7 +4,10 @@ resource "aws_instance" "rhel_instance" {
   subnet_id              = data.terraform_remote_state.aws_dev_vpc.outputs.vpc_public_subnets[0]
   key_name               = var.aws_key_pair_name
   tags                   = var.ec2_tags
-  vpc_security_group_ids = [data.terraform_remote_state.aws_dev_vpc.outputs.security_group-ssh_http_https_allowed]
+  vpc_security_group_ids = [
+    data.terraform_remote_state.aws_dev_vpc.outputs.security_group-ssh_http_https_allowed,
+    aws_security_group.demo_ssh_drift.id,
+  ]
   iam_instance_profile   = "tfstacks-profile"
 
   # First-boot bootstrap: create the `aap` user, install the Vault SSH CA
