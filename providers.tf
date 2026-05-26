@@ -2,11 +2,11 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 4.67.0"
+      version = "~> 6.46"
     }
     aap = {
       source  = "ansible/aap"
-      version = "~> 1"
+      version = "~> 1.5"
     }
   }
 }
