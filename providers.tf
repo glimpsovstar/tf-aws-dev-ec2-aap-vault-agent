@@ -17,6 +17,7 @@ provider "aws" {
 
 provider "aap" {
   host     = var.aap_host
-  username = var.aap_username
-  password = var.aap_password
+  token    = var.aap_token
+#  username = var.aap_username
+#  password = var.aap_password
 }
