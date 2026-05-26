@@ -51,8 +51,8 @@
           Drift detected on {{ tfc_workspace_name }} -
           {{ tfc_resources_drifted | default('?') }} resource(s) drifted
         description: "{{ cr_description }}"
-        urgency: 3
-        impact: 3
+        urgency: low
+        impact: low
       register: incident
 
     - name: Create Normal Change Request (correlation_id = workspace_id)
@@ -61,10 +61,10 @@
         type: normal
         short_description: "{{ cr_short_description }}"
         description: "{{ cr_description }}"
+        assignment_group: "CAB Approval"
         other:
           correlation_id: "{{ tfc_workspace_id }}"
           correlation_display: "TFC workspace: {{ tfc_workspace_name }}"
-          assignment_group: "CAB Approval"
       register: cr
 
     - name: Link the incident to the CR

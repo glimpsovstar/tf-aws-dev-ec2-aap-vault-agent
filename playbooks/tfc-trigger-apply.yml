@@ -15,7 +15,11 @@
 
   vars:
     tfc_host: app.terraform.io
-    tfe_token: "{{ lookup('env', 'TFE_TOKEN') }}"
+    # The "HCP Terraform API Token" credential type injects this as an
+    # extra_var named `hcpterraform_api_token` (per the credential type's
+    # injectors), not as TFE_TOKEN. Match the upstream demo-aap-post-deploy
+    # convention.
+    tfe_token: "{{ hcpterraform_api_token | default('') }}"
 
   tasks:
     - name: Validate inputs
@@ -26,8 +30,9 @@
           - tfe_token | length > 0
         fail_msg: >-
           Required: tfc_workspace_id (extra_var passed by the snow-cr-approval
-          rulebook from the SN webhook's correlation_id) and TFE_TOKEN (from
-          the attached HCP Terraform API Token credential).
+          rulebook from the SN webhook's correlation_id) and the
+          hcpterraform_api_token extra_var (from the attached HCP Terraform
+          API Token credential).
 
     - name: Trigger auto-apply run on HCP Terraform
       ansible.builtin.uri:
