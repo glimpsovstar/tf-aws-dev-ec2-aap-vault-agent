@@ -72,9 +72,11 @@
         # Use a dedicated group ("TFC Drift Approvers") with just admin as a
         # member. The colleague's "Software" group hit an "Abort changes on
         # group" rule in this PDI; a fresh group sidesteps it entirely.
-        assignment_group: "be39d99293854f105e8930018bba10d5"   # TFC Drift Approvers
+        # NOTE: the module's assignment_group parameter expects the group's
+        # NAME (not sys_id) - it does a lookup internally.
+        assignment_group: "TFC Drift Approvers"
         other:
-          assigned_to: "6816f79cc0a8016401c5a33be04be441"      # admin user in dev389292
+          assigned_to: "6816f79cc0a8016401c5a33be04be441"      # admin user sys_id in dev389292
           correlation_id: "{{ tfc_workspace_id }}"
           correlation_display: "TFC workspace: {{ tfc_workspace_name }}"
       register: cr
