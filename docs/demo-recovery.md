@@ -20,7 +20,35 @@ Companion to [solution-brief.md](solution-brief.md) and [implementation-plan.md]
 
 **Recovery:** No mid-demo fix needed. The failure path running cleanly IS the demo. After the session, click the failed job in AAP → Relaunch.
 
-### 3. Drift detection slow to fire
+### 3. AAP job stuck "running" with no stdout (zombie)
+
+**Symptom:** A job in AAP shows `running` for several minutes with `host_status_counts: null` and zero stdout. The TFC action that triggered it sits in "running" status too. Eventually TFC's `wait_for_completion_timeout_seconds` fires and the action errors.
+
+**Cause (observed once):** AAP control plane wedged after a previous workflow failure left zombie state in the job queue. Subsequent job launches from Terraform actions get accepted but never advance to inventory phase.
+
+**Talk track:** "AAP just zombied that job — happens occasionally with the controller. Quick fix is a cancel and relaunch. In a production setup we'd have AAP cluster redundancy and the job would move to a healthy node."
+
+**Recovery (under a minute):**
+
+```bash
+# Find the stuck job (replace token + URL)
+curl -sk -H "Authorization: Bearer $AAP_TOKEN" "$AAP_HOST/api/controller/v2/jobs/?status=running" | jq '.results[] | {id, name, elapsed}'
+
+# Cancel it
+curl -sk -X POST -H "Authorization: Bearer $AAP_TOKEN" "$AAP_HOST/api/controller/v2/jobs/<JOB_ID>/cancel/"
+
+# Relaunch the JT directly (passes inventory 3 = "Better Together Demo")
+curl -sk -X POST -H "Authorization: Bearer $AAP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"inventory": 3}' \
+  "$AAP_HOST/api/controller/v2/job_templates/<JT_ID>/launch/"
+```
+
+Or do it in the AAP UI: Jobs → click the running one → Cancel; then Templates → Chrony Time Sync → Launch.
+
+**If the original TFC apply errored** because the action timed out: just re-trigger plan + apply in TFC. Resources are already in the desired state, so the plan is a no-op.
+
+### 4. Drift detection slow to fire
 
 **Symptom:** You change a tag in AWS, but TFC drift assessment doesn't fire within demo time window.
 
