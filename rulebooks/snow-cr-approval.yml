@@ -1,0 +1,54 @@
+---
+# Listens for SNOW change-request approval events on EDA Event Stream
+# snow-approval-stream. SNOW's Outbound REST Message (configured by the SN
+# admin to fire on CR state -> approved) POSTs the payload below; this
+# rulebook fires the tfc-trigger-apply job template which calls the HCP TF
+# API to auto-apply the workspace identified by correlation_id.
+#
+# Expected payload shape (configure in SN's Outbound REST Message template):
+#   {
+#     "approval_state":   "approved",
+#     "correlation_id":   "ws-565GX2N7WBk8G2m8",
+#     "cr_number":        "CHG0030042",
+#     "cr_sys_id":        "<sys_id>",
+#     "approver":         "admin",
+#     "approver_display": "David Joo"
+#   }
+
+- name: listen for SNOW CR approval events
+  hosts: all
+  sources:
+    - name: snow_cr_approval
+      ansible.eda.webhook:
+        host: 0.0.0.0
+        port: 5005
+
+  rules:
+    - name: CR Approved - trigger HCP TF apply
+      condition: event.payload.approval_state == "approved" and event.payload.correlation_id is defined
+      # Dedup: SN's approval engine often transitions the CR's `approval`
+      # field more than once during the approval cascade (1-2s apart), which
+      # would otherwise fire two duplicate TFC applies. Throttle on cr_number.
+      throttle:
+        group_by_attributes:
+          - event.payload.cr_number
+        once_within: 5 minutes
+      actions:
+        - debug:
+            var: event.payload
+        - run_job_template:
+            name: tfc-trigger-apply
+            organization: Default
+            job_args:
+              extra_vars:
+                tfc_workspace_id: "{{ event.payload.correlation_id }}"
+                tfc_run_message: "Drift remediation - ServiceNow {{ event.payload.cr_number }} approved by {{ event.payload.approver_display | default(event.payload.approver) }}"
+                tfc_approver: "{{ event.payload.approver_display | default(event.payload.approver) }}"
+                tfc_cr_number: "{{ event.payload.cr_number }}"
+                tfc_cr_sys_id: "{{ event.payload.cr_sys_id | default('') }}"
+
+    - name: catchall non-approved events
+      condition: event.payload.approval_state != "approved"
+      action:
+        print_event:
+          pretty: true

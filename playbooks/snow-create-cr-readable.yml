@@ -1,0 +1,58 @@
+---
+# Improved version of the upstream snow_create_cr_wait.yml with a much more
+# readable CR description (structured plain text instead of a raw JSON dump).
+# Same underlying behaviour: creates a SNOW Normal Change Request and waits
+# for approval before returning. Used by Workflow 25's "Create SNOW Normal
+# Change Record" node to gate drift remediation behind a human CAB approval.
+
+- name: Create a SNOW Normal Change Request (readable)
+  hosts: all
+  gather_facts: false
+  connection: local
+
+  vars:
+    servicenow_cr: create_wait
+
+    cr_short_description: >-
+      Drift remediation: {{ tfc_workspace_name }}
+      ({{ ansible_eda.event.payload.details.new_assessment_result.resources_drifted | default('?') }}
+       resource(s) drifted)
+
+    cr_description: |-
+      Drift Detected
+      ==============
+      Workspace:        {{ tfc_organization_name }}/{{ tfc_workspace_name }}
+      Resources drifted: {{ ansible_eda.event.payload.details.new_assessment_result.resources_drifted | default('?') }}
+      Resources OK:      {{ ansible_eda.event.payload.details.new_assessment_result.resources_undrifted | default('?') }}
+      Assessment ID:     {{ ansible_eda.event.payload.details.new_assessment_result.id | default('?') }}
+      Detected at:       {{ ansible_eda.event.payload.details.new_assessment_result.created_at | default('?') }}
+      Incident:          {{ ticket_number | default('?') }}
+
+      Plan Summary
+      ============
+      To add:     {{ terraformplanresult.resource_changes | default([]) | selectattr('change.actions','contains','create') | list | length }}
+      To change:  {{ terraformplanresult.resource_changes | default([]) | selectattr('change.actions','contains','update') | list | length }}
+      To destroy: {{ terraformplanresult.resource_changes | default([]) | selectattr('change.actions','contains','delete') | list | length }}
+
+      Resources to be modified
+      ========================
+      {% for r in terraformplanresult.resource_changes | default([]) %}
+      - {{ r.address }} ({{ r.change.actions | join(', ') }})
+      {% endfor %}
+
+      Links
+      =====
+      Workspace:  https://app.terraform.io/app/{{ tfc_organization_name }}/workspaces/{{ tfc_workspace_name }}
+      Assessment: {{ ansible_eda.event.payload.details.new_assessment_result.url | default('n/a') }}
+      TFC Plan:   https://app.terraform.io/app/{{ tfc_organization_name }}/workspaces/{{ tfc_workspace_name }}/runs/{{ terraformplanresponse.json.data.id | default('?') }}
+
+      Action on Approval
+      ==================
+      Approving this Change Request will trigger an auto-applied run in HCP
+      Terraform to revert the drift back to the desired state. Rejecting this
+      CR leaves the drift in place; another assessment will catch it on the
+      next cycle.
+
+  roles:
+    - demo.process.snow_change_request
+  run_once: true

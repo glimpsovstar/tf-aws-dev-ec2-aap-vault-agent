@@ -1,0 +1,84 @@
+---
+# Fired by EDA when TFC reports drift. Creates a SNOW incident + Normal CR
+# linked by correlation_id (= TFC workspace_id). EXITS IMMEDIATELY after
+# creation; the CR sits in SN waiting for human CAB approval. When approved,
+# SN's Outbound REST Message POSTs to the snow-cr-approval EDA stream, which
+# fires the tfc-trigger-apply job template to do the actual remediation.
+#
+# Inputs (passed by the rulebook from the TFC notification payload):
+#   tfc_workspace_id, tfc_workspace_name, tfc_organization_name,
+#   tfc_assessment_id, tfc_assessment_url,
+#   tfc_resources_drifted, tfc_resources_undrifted, tfc_assessment_created_at
+
+- name: Create SNOW incident + Normal CR for drift remediation
+  hosts: all
+  gather_facts: false
+  connection: local
+  run_once: true
+
+  vars:
+    cr_short_description: >-
+      Drift remediation: {{ tfc_workspace_name }}
+      ({{ tfc_resources_drifted | default('?') }} resource(s) drifted)
+
+    cr_description: |-
+      Drift Detected
+      ==============
+      Workspace:        {{ tfc_organization_name }}/{{ tfc_workspace_name }}
+      Workspace ID:     {{ tfc_workspace_id }}
+      Resources drifted: {{ tfc_resources_drifted | default('?') }}
+      Resources OK:      {{ tfc_resources_undrifted | default('?') }}
+      Assessment ID:     {{ tfc_assessment_id | default('?') }}
+      Detected at:       {{ tfc_assessment_created_at | default('?') }}
+
+      Links
+      =====
+      Workspace:  https://app.terraform.io/app/{{ tfc_organization_name }}/workspaces/{{ tfc_workspace_name }}
+      Assessment: {{ tfc_assessment_url | default('n/a') }}
+
+      Action on Approval
+      ==================
+      Approving this Change Request triggers an auto-applied run in HCP
+      Terraform to revert the drift back to the desired state. Rejection
+      leaves the drift in place; the next scheduled assessment will catch
+      it on the next cycle and re-open a new CR.
+
+  tasks:
+    - name: Open incident in ServiceNow
+      servicenow.itsm.incident:
+        state: in_progress
+        short_description: >-
+          Drift detected on {{ tfc_workspace_name }} -
+          {{ tfc_resources_drifted | default('?') }} resource(s) drifted
+        description: "{{ cr_description }}"
+        urgency: 3
+        impact: 3
+      register: incident
+
+    - name: Create Normal Change Request (correlation_id = workspace_id)
+      servicenow.itsm.change_request:
+        state: assess
+        type: normal
+        short_description: "{{ cr_short_description }}"
+        description: "{{ cr_description }}"
+        other:
+          correlation_id: "{{ tfc_workspace_id }}"
+          correlation_display: "TFC workspace: {{ tfc_workspace_name }}"
+          assignment_group: "CAB Approval"
+      register: cr
+
+    - name: Link the incident to the CR
+      servicenow.itsm.incident:
+        state: in_progress
+        number: "{{ incident.record.number }}"
+        other:
+          rfc: "{{ cr.record.sys_id }}"
+      when: incident.record.number is defined and cr.record.sys_id is defined
+
+    - name: Show what we created
+      ansible.builtin.debug:
+        msg:
+          - "Incident: {{ incident.record.number | default('n/a') }}"
+          - "Change Request: {{ cr.record.number | default('n/a') }}"
+          - "Correlation ID (= TFC workspace_id): {{ tfc_workspace_id }}"
+          - "Awaiting CAB approval in ServiceNow..."

@@ -1,0 +1,44 @@
+---
+# Listens for TFC drift notifications (delivered via EDA Event Stream
+# tfc-drift-stream, HMAC-signed). On drift, fires the drift-create-snow-tickets
+# job template - the JT exits as soon as the SNOW incident + CR are created,
+# no polling. A separate rulebook (snow-cr-approval.yml) handles the
+# approval-triggered remediation.
+
+- name: listen for tfc drift events
+  hosts: all
+  sources:
+    # NOTE: when this rulebook is run via an AAP Event Stream (source_mapping),
+    # the webhook source is replaced at activation time by the Event Stream's
+    # gateway, which handles HMAC verification itself. The host/port below are
+    # only used when running the rulebook directly (e.g. ansible-rulebook CLI).
+    - name: notifications
+      ansible.eda.webhook:
+        host: 0.0.0.0
+        port: 5004
+
+  rules:
+    - name: Drift Detected
+      condition: event.payload.message == "Drift Detected" and event.payload.details.new_assessment_result.resources_drifted > 0
+      actions:
+        - debug:
+            var: event.payload
+        - run_job_template:
+            name: drift-create-snow-tickets
+            organization: Default
+            job_args:
+              extra_vars:
+                tfc_workspace_id: "{{ event.payload.details.workspace_id }}"
+                tfc_workspace_name: "{{ event.payload.details.workspace_name }}"
+                tfc_organization_name: "{{ event.payload.details.organization_name }}"
+                tfc_assessment_id: "{{ event.payload.details.new_assessment_result.id }}"
+                tfc_assessment_url: "{{ event.payload.details.new_assessment_result.url }}"
+                tfc_resources_drifted: "{{ event.payload.details.new_assessment_result.resources_drifted }}"
+                tfc_resources_undrifted: "{{ event.payload.details.new_assessment_result.resources_undrifted }}"
+                tfc_assessment_created_at: "{{ event.payload.details.new_assessment_result.created_at }}"
+
+    - name: catchall non-drift TFC events
+      condition: event.payload.message != "Drift Detected"
+      action:
+        print_event:
+          pretty: true

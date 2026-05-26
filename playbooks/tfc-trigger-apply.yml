@@ -1,0 +1,116 @@
+---
+# Fired by EDA when a SNOW CR transitions to "approved". Triggers an
+# auto-applied run on the HCP TF workspace identified by correlation_id
+# (passed in as tfc_workspace_id), waits for it to reach a terminal state,
+# and updates the SN CR with the result.
+#
+# Inputs (passed by the snow-cr-approval rulebook):
+#   tfc_workspace_id, tfc_run_message, tfc_approver,
+#   tfc_cr_number, tfc_cr_sys_id
+
+- name: Trigger HCP Terraform auto-apply after SNOW CR approval
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    tfc_host: app.terraform.io
+    tfe_token: "{{ lookup('env', 'TFE_TOKEN') }}"
+
+  tasks:
+    - name: Validate inputs
+      ansible.builtin.assert:
+        that:
+          - tfc_workspace_id is defined
+          - tfc_workspace_id | length > 0
+          - tfe_token | length > 0
+        fail_msg: >-
+          Required: tfc_workspace_id (extra_var passed by the snow-cr-approval
+          rulebook from the SN webhook's correlation_id) and TFE_TOKEN (from
+          the attached HCP Terraform API Token credential).
+
+    - name: Trigger auto-apply run on HCP Terraform
+      ansible.builtin.uri:
+        url: "https://{{ tfc_host }}/api/v2/runs"
+        method: POST
+        headers:
+          Content-Type: application/vnd.api+json
+          Authorization: "Bearer {{ tfe_token }}"
+        body_format: json
+        status_code: 201
+        body:
+          data:
+            type: runs
+            attributes:
+              message: "{{ tfc_run_message | default('Drift remediation triggered by AAP') }}"
+              auto-apply: true
+              refresh: true
+            relationships:
+              workspace:
+                data:
+                  type: workspaces
+                  id: "{{ tfc_workspace_id }}"
+      register: tfc_run
+
+    - name: Record run identifiers
+      ansible.builtin.set_fact:
+        tfc_run_id: "{{ tfc_run.json.data.id }}"
+        tfc_run_url: "https://{{ tfc_host }}/app/{{ tfc_organization_name | default('-') }}/workspaces/{{ tfc_workspace_name | default(tfc_workspace_id) }}/runs/{{ tfc_run.json.data.id }}"
+
+    - name: Post a worknote on the SN CR with the TFC run link
+      servicenow.itsm.change_request:
+        state: implement
+        number: "{{ tfc_cr_number }}"
+        other:
+          work_notes: >-
+            Approved by {{ tfc_approver | default('unknown') }}.
+            HCP Terraform run triggered: {{ tfc_run_url }}
+      when: tfc_cr_number is defined and tfc_cr_number | length > 0
+
+    - name: Wait for TFC run to reach a terminal state
+      ansible.builtin.uri:
+        url: "https://{{ tfc_host }}/api/v2/runs/{{ tfc_run_id }}"
+        headers:
+          Authorization: "Bearer {{ tfe_token }}"
+      register: tfc_run_status
+      retries: 60
+      delay: 10
+      until: >-
+        tfc_run_status.json.data.attributes.status in [
+          'applied', 'planned_and_finished',
+          'errored', 'canceled', 'discarded',
+          'policy_soft_failed', 'post_apply_completed'
+        ]
+
+    - name: Show final TFC run status
+      ansible.builtin.debug:
+        msg:
+          - "Run ID:        {{ tfc_run_id }}"
+          - "Final status:  {{ tfc_run_status.json.data.attributes.status }}"
+          - "Has changes:   {{ tfc_run_status.json.data.attributes['has-changes'] }}"
+          - "Run URL:       {{ tfc_run_url }}"
+
+    - name: Close the SN CR with successful close code
+      servicenow.itsm.change_request:
+        state: closed
+        number: "{{ tfc_cr_number }}"
+        close_code: successful
+        close_notes: "Drift remediated. TFC run: {{ tfc_run_url }}"
+      when:
+        - tfc_cr_number is defined and tfc_cr_number | length > 0
+        - tfc_run_status.json.data.attributes.status in ['applied', 'planned_and_finished', 'post_apply_completed']
+
+    - name: Close the SN CR with unsuccessful close code (run failed)
+      servicenow.itsm.change_request:
+        state: closed
+        number: "{{ tfc_cr_number }}"
+        close_code: unsuccessful
+        close_notes: "Drift remediation FAILED. TFC run status: {{ tfc_run_status.json.data.attributes.status }}. URL: {{ tfc_run_url }}"
+      when:
+        - tfc_cr_number is defined and tfc_cr_number | length > 0
+        - tfc_run_status.json.data.attributes.status not in ['applied', 'planned_and_finished', 'post_apply_completed']
+
+    - name: Fail the playbook if TFC apply did not succeed
+      ansible.builtin.fail:
+        msg: "TFC run {{ tfc_run_id }} ended in {{ tfc_run_status.json.data.attributes.status }}. Investigate {{ tfc_run_url }}"
+      when: tfc_run_status.json.data.attributes.status not in ['applied', 'planned_and_finished', 'post_apply_completed']
