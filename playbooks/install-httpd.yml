@@ -1,0 +1,55 @@
+---
+- name: Install and start native httpd on RHEL
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    httpd_index_content: |
+      <html><body>
+        <h1>HashiCorp + Red Hat — better together on AWS</h1>
+        <p>Served by native httpd on RHEL, provisioned via TFC + AAP.</p>
+      </body></html>
+
+  tasks:
+    - name: Wait for SSH connection
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 120
+
+    - name: Install httpd
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+
+    - name: Drop demo index.html
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        content: "{{ httpd_index_content }}"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Open firewall for http (if firewalld active)
+      ansible.posix.firewalld:
+        service: http
+        state: enabled
+        permanent: true
+        immediate: true
+      when: ansible_facts.services is not defined or 'firewalld.service' in (ansible_facts.services | default({}))
+      failed_when: false
+
+    - name: Enable and start httpd
+      ansible.builtin.systemd:
+        name: httpd
+        state: started
+        enabled: true
+
+    - name: Show service status
+      ansible.builtin.command: systemctl is-active httpd
+      register: httpd_active
+      changed_when: false
+
+    - name: Confirm
+      ansible.builtin.debug:
+        msg: "httpd is {{ httpd_active.stdout }} on {{ inventory_hostname }}"

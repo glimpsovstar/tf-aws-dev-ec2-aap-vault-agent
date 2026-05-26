@@ -36,6 +36,14 @@ variable "TFC_WORKSPACE_ID" {
   description = "Terraform Cloud workspace ID"
 }
 
+# Bump this value (e.g. 1 -> 2) and apply to fire the chrony_timesync action via
+# the after_update trigger on terraform_data.vm_provisioned. Demo handle only.
+variable "demo_chrony_trigger" {
+  type        = number
+  default     = 1
+  description = "Bump to fire the chrony_timesync after_update action."
+}
+
 variable "aap_endpoint" {
   type        = string
   description = "AAP API endpoint"

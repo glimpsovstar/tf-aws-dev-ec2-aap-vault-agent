@@ -1,0 +1,54 @@
+---
+- name: Register host to Red Hat with rhc
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    rhel_org_id: undef
+    rhel_activation_key: undef
+
+  tasks:
+    - name: Validate required extra_vars
+      ansible.builtin.assert:
+        that:
+          - rhel_org_id is defined and rhel_org_id != "undef"
+          - rhel_activation_key is defined and rhel_activation_key != "undef"
+        fail_msg: >-
+          Pass rhel_org_id and rhel_activation_key as extra_vars
+          (sourced from Vault aap-kv/rhel-subscription by Terraform).
+
+    - name: Wait for SSH connection
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 120
+
+    - name: Ensure rhc package is present
+      ansible.builtin.dnf:
+        name: rhc
+        state: present
+
+    - name: Check current rhc connection status
+      ansible.builtin.command: rhc status
+      register: rhc_status
+      changed_when: false
+      failed_when: false
+
+    - name: Connect host to Red Hat
+      ansible.builtin.command:
+        cmd: >-
+          rhc connect
+          --activation-key {{ rhel_activation_key }}
+          --organization {{ rhel_org_id }}
+      when: "'Not connected' in rhc_status.stdout or rhc_status.rc != 0"
+      no_log: true
+      register: rhc_connect
+
+    - name: Confirm registration
+      ansible.builtin.command: rhc status
+      register: rhc_final
+      changed_when: false
+
+    - name: Show registration result
+      ansible.builtin.debug:
+        msg: "{{ rhc_final.stdout_lines }}"

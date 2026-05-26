@@ -8,6 +8,10 @@ terraform {
       source  = "ansible/aap"
       version = "~> 1.5"
     }
+    vault = {
+      source  = "hashicorp/vault"
+      version = "~> 5.5"
+    }
   }
 }
 
@@ -16,8 +20,10 @@ provider "aws" {
 }
 
 provider "aap" {
-  host     = var.aap_host
-  token    = var.aap_token
-#  username = var.aap_username
-#  password = var.aap_password
+  host  = var.aap_host
+  token = var.aap_token
 }
+
+# Auth via TFC dynamic provider credentials (TFC_VAULT_PROVIDER_AUTH=true).
+# VAULT_ADDR / VAULT_NAMESPACE / VAULT_TOKEN are injected at run time.
+provider "vault" {}

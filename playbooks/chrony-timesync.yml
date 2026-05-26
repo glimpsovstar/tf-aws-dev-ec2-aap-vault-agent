@@ -1,0 +1,37 @@
+---
+- name: Ensure chrony is installed and time sync is healthy
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Wait for SSH connection
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 120
+
+    - name: Install chrony
+      ansible.builtin.dnf:
+        name: chrony
+        state: present
+
+    - name: Enable and start chronyd
+      ansible.builtin.systemd:
+        name: chronyd
+        state: started
+        enabled: true
+
+    - name: Force a sync now (best-effort)
+      ansible.builtin.command: chronyc -a makestep
+      register: chrony_step
+      changed_when: "'200 OK' in chrony_step.stdout"
+      failed_when: false
+
+    - name: Capture chrony tracking
+      ansible.builtin.command: chronyc tracking
+      register: chrony_tracking
+      changed_when: false
+
+    - name: Show tracking output
+      ansible.builtin.debug:
+        msg: "{{ chrony_tracking.stdout_lines }}"
