@@ -76,6 +76,13 @@ The work was bootstrapped with these tokens shared in conversation — rotate al
 - The `TFC_VAULT_*` env vars on the workspace — same.
 - The new playbooks in `playbooks/` and the AAP job templates pointing at them — same.
 
+## v2 cleanup items (post-MVP)
+
+1. **Switch `data.vault_kv_secret_v2.rhel_subscription` to the ephemeral form** — TFC plans emit a deprecation warning today. The ephemeral resource keeps secret values out of state entirely, a stronger story for the audience. Test in a feature branch — needs verification that `action.config.extra_vars` accepts ephemeral references.
+2. **Vault AWS secrets engine for IAM** — replace the static `tfstacks-profile` EC2 instance profile with Vault-issued short-lived AWS creds. Strong "no static cloud creds" narrative.
+3. **HMAC verification on the EDA webhook** — currently the `tfc-webhook.yml` rulebook has HMAC commented out. Enable it (TFC notification config supports it) for the production-style story.
+4. **Custom Packer-built RHEL AMI** — pre-bake CIS hardening + ssh CA trust + base agents so first-apply is faster.
+
 ## Quick-reference links
 
 - TFC workspace: https://app.terraform.io/app/djoo-hashicorp/workspaces/tf-aws-dev-ec2-aap-vault-agent
