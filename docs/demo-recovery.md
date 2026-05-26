@@ -58,7 +58,32 @@ Or do it in the AAP UI: Jobs → click the running one → Cancel; then Template
 
 **Proper fix (upstream PR opportunity):** Refactor `snow_cmdb_update.yml` and `raise-incident-ticket.yml` to use `connection: local` + `gather_facts: false`, and read `os` from inventory variables (set by Terraform at host-registration time) rather than from live facts. Decouples SNOW work from SSH access entirely.
 
-### 5. Drift detection slow to fire
+### 5. Playbook changes didn't take effect after git push
+
+**Symptom:** You commit + push a fix to a playbook or rulebook, re-run the job, and see the OLD behavior. The job stdout matches what the playbook used to do.
+
+**Cause:** AAP controller project 27 (`tf-aws-dev-ec2-aap-vault-agent`) and EDA project 2 (`tf-aws-dev-ec2-aap-vault-agent EDA`) both have `scm_update_on_launch: false` (so jobs start fast without Galaxy retries). They don't auto-sync on git push.
+
+**Recovery:** After every push that changes a playbook or rulebook, sync both projects:
+
+```bash
+export AAP_HOST="https://aap.david-joo.sbx.hashidemos.io"
+export AAP_TOKEN="..."
+
+# Controller project (playbooks)
+curl -sk -X POST -H "Authorization: Bearer $AAP_TOKEN" \
+  "$AAP_HOST/api/controller/v2/projects/27/update/"
+
+# EDA project (rulebooks) — only needed if you changed a rulebook
+curl -sk -X POST -H "Authorization: Bearer $AAP_TOKEN" \
+  "$AAP_HOST/api/eda/v1/projects/2/sync/"
+```
+
+Or click the sync button in the AAP UI for each project.
+
+**Permanent fix:** Configure a GitHub webhook → AAP project sync URL in each project's Settings → Webhooks. Then pushes auto-trigger sync without the slow `scm_update_on_launch` behavior.
+
+### 6. Drift detection slow to fire
 
 **Symptom:** You change a tag in AWS, but TFC drift assessment doesn't fire within demo time window.
 

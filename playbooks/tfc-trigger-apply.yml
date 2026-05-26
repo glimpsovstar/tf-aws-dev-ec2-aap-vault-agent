@@ -95,6 +95,22 @@
           - "Has changes:   {{ tfc_run_status.json.data.attributes['has-changes'] }}"
           - "Run URL:       {{ tfc_run_url }}"
 
+    # SN's Change Model enforces sequential state transitions:
+    # Scheduled -> Implement -> Review -> Closed. Walk it instead of jumping
+    # straight to Closed (which gets blocked by the 'Check State Transition'
+    # Business Rule).
+    - name: Transition CR to Implement
+      servicenow.itsm.change_request:
+        state: implement
+        number: "{{ tfc_cr_number }}"
+      when: tfc_cr_number is defined and tfc_cr_number | length > 0
+
+    - name: Transition CR to Review
+      servicenow.itsm.change_request:
+        state: review
+        number: "{{ tfc_cr_number }}"
+      when: tfc_cr_number is defined and tfc_cr_number | length > 0
+
     - name: Close the SN CR with successful close code
       servicenow.itsm.change_request:
         state: closed

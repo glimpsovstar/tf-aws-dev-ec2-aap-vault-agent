@@ -89,7 +89,7 @@ Navigate: **System Definition → Business Rules → New**
 | Table | `change_request` |
 | When | `after` |
 | Update | ✓ |
-| Filter conditions | `Approval` `changes to` `Approved` (or `State changes to Approved` depending on your CAB workflow) |
+| Filter conditions | **`Approval`** (NOT "State") `changes to` `Approved` **AND** `Correlation ID` `is not empty` |
 | Advanced | ✓ |
 
 Script:
