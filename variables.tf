@@ -31,11 +31,6 @@ variable "ec2_tags" {
   }
 }
 
-variable "job_template_id" {
-  type        = string
-  description = "ID of the AAP job template"
-}
-
 variable "TFC_WORKSPACE_ID" {
   type        = string
   description = "Terraform Cloud workspace ID"

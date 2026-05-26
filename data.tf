@@ -16,3 +16,8 @@ data "terraform_remote_state" "iam_role" {
     }
   }
 }
+
+data "aap_workflow_job_template" "aap_post_deployment" {
+  name              = "AAP Post Deployment"
+  organization_name = "Default"
+}

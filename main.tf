@@ -70,11 +70,3 @@ resource "aap_host" "vm_host" {
     ansible_host = aws_instance.rhel_instance.public_ip
   })
 }
-
-resource "aap_job" "vm_demo_job" {
-  job_template_id = var.job_template_id
-  inventory_id    = aap_inventory.vm_inventory.id
-  extra_vars      = jsonencode({})
-  triggers        = local.vm_names
-  depends_on      = [aap_inventory.vm_inventory]
-}
