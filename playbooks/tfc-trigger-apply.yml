@@ -62,15 +62,20 @@
         tfc_run_id: "{{ tfc_run.json.data.id }}"
         tfc_run_url: "https://{{ tfc_host }}/app/{{ tfc_organization_name | default('-') }}/workspaces/{{ tfc_workspace_name | default(tfc_workspace_id) }}/runs/{{ tfc_run.json.data.id }}"
 
-    - name: Post a worknote on the SN CR with the TFC run link
+    # Post a worknote WITHOUT changing state. Updating state here (e.g. to
+    # 'implement') trips SN's "Change Model: Check State Transition" guard when
+    # the CR isn't in a legal prior state. CR lifecycle is left to ServiceNow's
+    # own Change workflow — the colleague's tfc_trigger_apply role does the
+    # same (it never touches CR state). best-effort: never fail the job on this.
+    - name: Post a worknote on the SN CR with the TFC run link (best-effort)
       servicenow.itsm.change_request:
-        state: implement
         number: "{{ tfc_cr_number }}"
         other:
           work_notes: >-
             Approved by {{ tfc_approver | default('unknown') }}.
-            HCP Terraform run triggered: {{ tfc_run_url }}
+            HCP Terraform remediation run triggered: {{ tfc_run_url }}
       when: tfc_cr_number is defined and tfc_cr_number | length > 0
+      failed_when: false
 
     - name: Wait for TFC run to reach a terminal state
       ansible.builtin.uri:
@@ -93,45 +98,39 @@
           - "Run ID:        {{ tfc_run_id }}"
           - "Final status:  {{ tfc_run_status.json.data.attributes.status }}"
           - "Has changes:   {{ tfc_run_status.json.data.attributes['has-changes'] }}"
+          - "Drift remediation: {{ 'COMPLETE' if tfc_run_status.json.data.attributes.status in ['applied', 'planned_and_finished'] else 'FAILED' }}"
           - "Run URL:       {{ tfc_run_url }}"
 
-    # SN's Change Model enforces sequential state transitions:
-    # Scheduled -> Implement -> Review -> Closed. Walk it instead of jumping
-    # straight to Closed (which gets blocked by the 'Check State Transition'
-    # Business Rule).
-    - name: Transition CR to Implement
+    # Best-effort CR closure. SN's Change Model requires sequential transitions
+    # (assess -> authorize -> scheduled -> implement -> review -> closed). We
+    # don't know the CR's current state, so we attempt each forward step and
+    # never fail the job on a blocked/illegal transition — ServiceNow will also
+    # close the CR via its own workflow after the change window.
+    - name: Best-effort walk CR toward Closed
       servicenow.itsm.change_request:
-        state: implement
         number: "{{ tfc_cr_number }}"
+        state: "{{ item }}"
+      loop:
+        - authorize
+        - scheduled
+        - implement
+        - review
+      loop_control:
+        label: "{{ item }}"
       when: tfc_cr_number is defined and tfc_cr_number | length > 0
+      failed_when: false
 
-    - name: Transition CR to Review
+    - name: Best-effort close the CR
       servicenow.itsm.change_request:
-        state: review
         number: "{{ tfc_cr_number }}"
+        state: closed
+        close_code: "{{ 'successful' if tfc_run_status.json.data.attributes.status in ['applied', 'planned_and_finished', 'post_apply_completed'] else 'unsuccessful' }}"
+        close_notes: "Drift remediation via TFC run {{ tfc_run_id }} ({{ tfc_run_status.json.data.attributes.status }}). {{ tfc_run_url }}"
       when: tfc_cr_number is defined and tfc_cr_number | length > 0
+      failed_when: false
 
-    - name: Close the SN CR with successful close code
-      servicenow.itsm.change_request:
-        state: closed
-        number: "{{ tfc_cr_number }}"
-        close_code: successful
-        close_notes: "Drift remediated. TFC run: {{ tfc_run_url }}"
-      when:
-        - tfc_cr_number is defined and tfc_cr_number | length > 0
-        - tfc_run_status.json.data.attributes.status in ['applied', 'planned_and_finished', 'post_apply_completed']
-
-    - name: Close the SN CR with unsuccessful close code (run failed)
-      servicenow.itsm.change_request:
-        state: closed
-        number: "{{ tfc_cr_number }}"
-        close_code: unsuccessful
-        close_notes: "Drift remediation FAILED. TFC run status: {{ tfc_run_status.json.data.attributes.status }}. URL: {{ tfc_run_url }}"
-      when:
-        - tfc_cr_number is defined and tfc_cr_number | length > 0
-        - tfc_run_status.json.data.attributes.status not in ['applied', 'planned_and_finished', 'post_apply_completed']
-
+    # The ONLY thing that fails this job is the actual remediation not landing.
     - name: Fail the playbook if TFC apply did not succeed
       ansible.builtin.fail:
-        msg: "TFC run {{ tfc_run_id }} ended in {{ tfc_run_status.json.data.attributes.status }}. Investigate {{ tfc_run_url }}"
+        msg: "TFC run {{ tfc_run_id }} ended in {{ tfc_run_status.json.data.attributes.status }}. Drift NOT remediated. Investigate {{ tfc_run_url }}"
       when: tfc_run_status.json.data.attributes.status not in ['applied', 'planned_and_finished', 'post_apply_completed']
