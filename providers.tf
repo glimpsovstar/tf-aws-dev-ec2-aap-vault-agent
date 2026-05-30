@@ -17,6 +17,12 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+  default_tags {
+    tags = {
+      "TFC Managed"        = "true"
+      "TF/TFC directories" = "djoo-hashicorp/tf-aws-dev-ec2-aap-vault-agent"
+    }
+  }
 }
 
 provider "aap" {
