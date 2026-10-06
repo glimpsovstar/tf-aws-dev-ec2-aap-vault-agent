@@ -12,6 +12,10 @@ terraform {
       source  = "hashicorp/vault"
       version = "~> 5.5"
     }
+    hcp = {
+      source  = "hashicorp/hcp"
+      version = "~> 0.110"
+    }
   }
 }
 
@@ -33,3 +37,7 @@ provider "aap" {
 # Auth via TFC dynamic provider credentials (TFC_VAULT_PROVIDER_AUTH=true).
 # VAULT_ADDR / VAULT_NAMESPACE / VAULT_TOKEN are injected at run time.
 provider "vault" {}
+
+# Reads HCP_CLIENT_ID, HCP_CLIENT_SECRET and HCP_PROJECT_ID from the environment
+# (set them as a variable set on the HCP Terraform workspace).
+provider "hcp" {}

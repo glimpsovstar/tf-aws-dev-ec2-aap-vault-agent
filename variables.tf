@@ -3,10 +3,33 @@ variable "aws_region" {
   default = "ap-southeast-2"
 }
 
-variable "ami_id" {
+# Image comes from HCP Packer (RHEL9-SOE: Uptycs EDR, `aap` user, Vault SSH CA).
+# HC-COMPUTE-011 requires EDR on every VM, so never pin a stock AMI here.
+variable "hcp_packer_bucket" {
   type        = string
-  default     = "ami-0df3f3adca5bd27bd" # RHEL9 - 2025-05-29
-  description = "The id of the machine image (AMI) to use for the server."
+  default     = "RHEL9-SOE"
+  description = "HCP Packer bucket holding the SOE image."
+}
+
+# HCP Packer addresses channels by slug, which is the lower-case channel name.
+variable "hcp_packer_channel" {
+  type        = string
+  default     = "production"
+  description = "HCP Packer channel slug to take the image from."
+}
+
+# Escape hatch only. It must be an AMI built from the RHEL9-SOE bucket (EDR
+# included). Never set it to a stock vendor/marketplace image. AMI ownership
+# cannot be checked statically, so this is enforced by review.
+variable "ami_override" {
+  type        = string
+  default     = null
+  description = "Optional AMI id that wins over HCP Packer. Must be an SOE build with EDR, not a stock image."
+
+  validation {
+    condition     = var.ami_override == null || can(regex("^ami-[0-9a-f]{8,17}$", var.ami_override))
+    error_message = "ami_override must be null or a valid AMI id (ami-...)."
+  }
 }
 
 variable "instance_type" {
