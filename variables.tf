@@ -14,7 +14,7 @@ variable "hcp_packer_bucket" {
 # HCP Packer addresses channels by slug, which is the lower-case channel name.
 variable "hcp_packer_channel" {
   type        = string
-  default     = "production"
+  default     = "Production" # channel names are case-sensitive in HCP Packer
   description = "HCP Packer channel slug to take the image from."
 }
 

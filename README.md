@@ -210,9 +210,9 @@ See `docs/demo-recovery.md` → "Post-demo cleanup" for the full list. Key items
 
 ## Image and EDR (HC-COMPUTE-011)
 
-- The instance image comes from HCP Packer bucket `RHEL9-SOE`, channel `production`, region `var.aws_region` (ap-southeast-2). It carries the Uptycs EDR agent, the `aap` user and the Vault SSH CA.
+- The instance image comes from HCP Packer bucket `RHEL9-SOE`, channel `Production`, region `var.aws_region` (ap-southeast-2). It carries the Uptycs EDR agent, the `aap` user and the Vault SSH CA.
 - Never pin a stock AMI. HashiCorp control HC-COMPUTE-011 needs EDR on every VM. `ami_override` exists only for an SOE build and defaults to null.
 - **Changing the image REPLACES the instance on the next apply.** Any manual Uptycs install on the existing instance is lost with it, so schedule the apply for a convenient time.
 - The workspace needs an HCP service principal in a variable set: `HCP_CLIENT_ID`, `HCP_CLIENT_SECRET` (sensitive) and `HCP_PROJECT_ID`. The `hcp` provider reads them from the environment.
-- The `production` channel must point at a gated SOE version before this plans cleanly.
+- The `Production` channel must point at a gated SOE version before this plans cleanly.
 
