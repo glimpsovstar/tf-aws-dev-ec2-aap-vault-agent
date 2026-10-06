@@ -39,7 +39,7 @@ After the demo, the customer can articulate:
 - AD domain join (not in current repo; defer)
 - vSphere-derived day-2 ops (power on/off, snapshot, reboot) — drop entirely for MVP
 - Vault AWS secrets engine for dynamic IAM (keep existing `tfstacks-profile` instance profile from [main.tf:8](../main.tf#L8); document AWS engine as v2 enhancement)
-- Custom Packer-built AMI (keep `var.ami_id` default RHEL9 AMI)
+- Custom Packer-built AMI (now the default: RHEL9-SOE from HCP Packer, see README)
 - Multi-region, HA, DR
 - AWS Backup integration (VMware `backup_policy` variable)
 - CIS hardening role unless trivially copy-pasteable

@@ -1,14 +1,14 @@
 resource "aws_instance" "rhel_instance" {
-  ami                    = var.ami_id
-  instance_type          = var.instance_type
-  subnet_id              = data.terraform_remote_state.aws_dev_vpc.outputs.vpc_public_subnets[0]
-  key_name               = var.aws_key_pair_name
-  tags                   = var.ec2_tags
+  ami           = coalesce(var.ami_override, data.hcp_packer_artifact.rhel9_soe.external_identifier)
+  instance_type = var.instance_type
+  subnet_id     = data.terraform_remote_state.aws_dev_vpc.outputs.vpc_public_subnets[0]
+  key_name      = var.aws_key_pair_name
+  tags          = var.ec2_tags
   vpc_security_group_ids = [
     data.terraform_remote_state.aws_dev_vpc.outputs.security_group-ssh_http_https_allowed,
     aws_security_group.demo_ssh_drift.id,
   ]
-  iam_instance_profile   = "tfstacks-profile"
+  iam_instance_profile = "tfstacks-profile"
 
   # First-boot bootstrap: create the `aap` user, install the Vault SSH CA
   # public key, and configure sshd to trust certs signed by it. The static djoo
@@ -67,7 +67,7 @@ locals {
 
 resource "null_resource" "wait_for_status_checks" {
   provisioner "local-exec" {
-    command = <<EOT
+    command     = <<EOT
       INSTANCE_ID=${aws_instance.rhel_instance.id}
       REGION="${var.aws_region}"
 
@@ -97,10 +97,10 @@ resource "aap_inventory" "vm_inventory" {
   name        = "Better Together Demo - ${var.TFC_WORKSPACE_ID}"
   description = "Inventory for VMs built with HCP Terraform and managed by AAP"
   variables   = jsonencode({})
-#  lifecycle {
-#    prevent_destroy = true
-#  }
-  depends_on  = [null_resource.wait_for_status_checks]
+  #  lifecycle {
+  #    prevent_destroy = true
+  #  }
+  depends_on = [null_resource.wait_for_status_checks]
 }
 
 resource "aap_host" "vm_host" {

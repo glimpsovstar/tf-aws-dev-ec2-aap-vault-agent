@@ -12,7 +12,7 @@ data "terraform_remote_state" "iam_role" {
   config = {
     organization = "djoo-hashicorp"
     workspaces = {
-      name = "tf-aws-ec2-iam-role"                 # The name of the TFC workspace for the IAM role
+      name = "tf-aws-ec2-iam-role" # The name of the TFC workspace for the IAM role
     }
   }
 }
@@ -46,4 +46,14 @@ data "aap_job_template" "chrony_timesync" {
 data "vault_kv_secret_v2" "rhel_subscription" {
   mount = "aap-kv"
   name  = "rhel-subscription"
+}
+
+# RHEL9-SOE image from HCP Packer (EDR agent baked in; HC-COMPUTE-011).
+# Auth: HCP_CLIENT_ID, HCP_CLIENT_SECRET and HCP_PROJECT_ID env vars on the
+# workspace (variable set). See README "Image and EDR".
+data "hcp_packer_artifact" "rhel9_soe" {
+  bucket_name  = var.hcp_packer_bucket
+  channel_name = var.hcp_packer_channel
+  platform     = "aws"
+  region       = var.aws_region
 }
